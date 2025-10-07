@@ -1,4 +1,319 @@
-Öğrenci No:
-AD-SOYAD:
+Öğrenci No: 240541031
+AD-SOYAD: Sezer ÇETİNKAYA 
 
 Lütfen seçtiğiniz algoritmaya ait çözümü ve diğer isterleri aşağıya ekleyiniz:
+ALGORİTMA: KutuphaneAramaSistemi
+
+--- Veri Modelleri ---
+BOOK:
+    id, title, authors[], isbn, year, publisher, language, genres[], summary, total_copies, available_copies, popularity_score
+
+INDEX:
+    inverted_index: map[token] -> list of (book_id, term_freq)
+    doc_freq: map[token] -> document_frequency
+    book_norm: map[book_id] -> normalization_factor (for TF-IDF)
+    last_indexed_time
+
+CACHE:
+    query_cache: LRUCache(query_string -> SearchResultPage)  // hızlı tekrarlar için
+
+--- Başlangıç / İndeksleme ---
+FONKSİYON RebuildIndex(all_books):
+    inverted_index ← boş map
+    doc_freq ← boş map
+    FOR each book IN all_books DO
+        doc_id ← book.id
+        text ← book.title + " " + join(book.authors," ") + " " + book.genres + " " + book.summary
+        tokens ← AnalyzeAndTokenize(text)
+        term_count_map ← map token -> count in this document
+        FOR token IN tokens DO
+            term_count_map[token] ← term_count_map.get(token,0) + 1
+        ENDFOR
+        total_terms ← sum of term_count_map values
+        // kayıt ve frekanslar
+        FOR each (token, tf) IN term_count_map DO
+            inverted_index[token].append( (doc_id, tf) )
+            doc_freq[token] ← doc_freq.get(token,0) + 1
+        ENDFOR
+        // normalize factor for later scoring (e.g., length normalization)
+        book_norm[doc_id] ← ComputeNormalization(total_terms)
+    ENDFOR
+    last_indexed_time ← now()
+END
+
+FONKSİYON IncrementalIndexAdd(book):
+    // yeni kitap eklendiğinde veya güncellendiğinde çağrılır
+    RemoveBookFromIndex(book.id)   // önce varsa temizle
+    tokens ← AnalyzeAndTokenize(book.title + " " + join(book.authors," ") + " " + book.genres + " " + book.summary)
+    term_count_map ← token frekansları
+    FOR each (token, tf) IN term_count_map DO
+        inverted_index[token].append( (book.id, tf) )
+        doc_freq[token] ← doc_freq.get(token,0) + 1
+    ENDFOR
+    book_norm[book.id] ← ComputeNormalization(sum(term_count_map))
+END
+
+FONKSİYON AnalyzeAndTokenize(text):
+    // normalize: küçük harf, noktalama kaldır, stopword çıkar, stem/lemmatize opsiyonel
+    text ← lower_case(text)
+    text ← remove_punctuation(text)
+    raw_tokens ← split_on_whitespace(text)
+    tokens ← empty list
+    FOR t IN raw_tokens DO
+        t2 ← remove_stopwords_and_normalize(t)   // ör. "the","ve" gibi çıkar
+        IF t2 ≠ "" THEN tokens.append(t2)
+    ENDFOR
+    RETURN tokens
+END
+
+FONKSİYON ComputeNormalization(total_terms):
+    RETURN 1.0 / sqrt(total_terms + 1)  // basit örnek
+END
+
+--- Arama akışı ---
+FONKSİYON Search(query_string, filters, sort_by, page, page_size, user_id):
+    // 0. Ön koşul: boş sorgu -> popüler / yeni kitap döndür
+    IF Trim(query_string) == "" THEN
+        results ← BrowseDefault(filters, sort_by, page, page_size)
+        RETURN results
+    ENDIF
+
+    // 1. Cache kontrolü
+    cache_key ← BuildCacheKey(query_string, filters, sort_by, page, page_size)
+    IF CACHE.query_cache.contains(cache_key) THEN
+        RETURN CACHE.query_cache.get(cache_key)
+    ENDIF
+
+    // 2. Sorgu analiz et (tokenize, phrase detection, boolean ops)
+    tokens, phrases, operators ← ParseQuery(query_string)  // örnek: "asimov robot -short"
+    analyzed_tokens ← []
+    FOR t IN tokens DO
+        analyzed_tokens.append( NormalizeToken(t) )
+    ENDFOR
+
+    // 3. Retrieve phase: inverted index'ten aday kitapları topla
+    candidate_scores ← map book_id -> partial_score_struct
+    FOR token IN analyzed_tokens DO
+        IF token IN INDEX.inverted_index THEN
+            postings ← INDEX.inverted_index[token]  // liste (book_id, tf)
+            idf ← ComputeIDF(token)
+            FOR (book_id, tf) IN postings DO
+                // temel TF-IDF katkısı
+                tfidf ← (tf) * idf
+                candidate_scores[book_id].score ← candidate_scores[book_id].score + tfidf
+                candidate_scores[book_id].matched_tokens.add(token)
+            ENDFOR
+        ELSE
+            // token dizindeki yok: fuzzy fallback için trigram veya edit-distance öner
+            similar_tokens ← FindSimilarTokens(token)  // trigram veya küçük edit-distance ile
+            FOR t2 IN similar_tokens DO
+                postings ← INDEX.inverted_index[t2]
+                idf2 ← ComputeIDF(t2) * 0.7  // benzer token'lere daha düşük ağırlık ver
+                FOR (book_id, tf) IN postings DO
+                    candidate_scores[book_id].score ← candidate_scores[book_id].score + tf * idf2
+                    candidate_scores[book_id].matched_tokens.add(t2)
+                ENDFOR
+            ENDFOR
+        ENDIF
+    ENDFOR
+
+    // 4. Phrase & proximity boost
+    FOR phrase IN phrases DO
+        phrase_matches ← PhraseSearch(phrase)  // pos bilgisi varsa hızlıdır
+        FOR book_id IN phrase_matches DO
+            candidate_scores[book_id].score ← candidate_scores[book_id].score + PHRASE_BOOST
+        ENDFOR
+    ENDFOR
+
+    // 5. Apply boolean operators and exclusions (ör. "-short" çıkar)
+    FOR each book_id IN candidate_scores.keys() DO
+        IF ViolatesFilters(book_id, filters) THEN
+            remove book_id from candidate_scores
+            CONTINUE
+        ENDIF
+        IF QueryHasExclusionMatches(book_id, operators) THEN
+            remove book_id from candidate_scores
+            CONTINUE
+        ENDIF
+    ENDFOR
+
+    // 6. Final scoring: normalize + popularity + availability + recency
+    FOR each (book_id, ps) IN candidate_scores DO
+        norm ← INDEX.book_norm[book_id]  // normalizasyon
+        popularity ← GetBookPopularity(book_id)  // geçmiş ödünç alma sayısı vb.
+        availability_bonus ← IF BookAvailable(book_id) THEN AVAIL_BONUS ELSE 0
+        recency_bonus ← ComputeRecencyBonus(book_id)
+        // ağırlıklı toplam
+        final_score ← (ps.score * norm * WEIGHT_TFIDF) + (popularity * WEIGHT_POP) + availability_bonus + recency_bonus
+        candidate_scores[book_id].final_score ← final_score
+    ENDFOR
+
+    // 7. Convert to sortable list and sort
+    result_list ← list of candidate_scores entries
+    SORT result_list by:
+        IF sort_by == "relevance" THEN -final_score
+        ELSE IF sort_by == "newest" THEN -book.year (veya publish_date)
+        ELSE IF sort_by == "popular" THEN -popularity
+        ELSE apply default relevance sort
+    ENDIF
+
+    // 8. Pagination
+    start ← (page - 1) * page_size
+    end ← start + page_size
+    page_results ← result_list[start:end]
+
+    // 9. Format results: include availability, location, snippet highlight
+    formatted ← []
+    FOR each entry IN page_results DO
+        book ← GetBookById(entry.book_id)
+        snippet ← GenerateSnippet(book, analyzed_tokens)
+        formatted.append( {
+            id: book.id,
+            title: book.title,
+            authors: book.authors,
+            year: book.year,
+            genres: book.genres,
+            available_copies: book.available_copies,
+            location: GetShelfLocation(book.id),
+            score: entry.final_score,
+            snippet: snippet
+        } )
+    ENDFOR
+
+    // 10. Cache kısa süreli sonuç
+    CACHE.query_cache.put(cache_key, formatted, ttl=SHORT_TTL)
+
+    // 11. Eğer hiç sonuç yoksa "Did you mean?" önerisi üret
+    IF formatted empty THEN
+        suggestions ← SuggestCorrections(analyzed_tokens)
+        RETURN {results: [], suggestions: suggestions}
+    ENDIF
+
+    RETURN formatted
+END
+
+--- Yardımcı Fonksiyonlar ---
+
+FONKSİYON ComputeIDF(token):
+    N ← total_document_count
+    df ← INDEX.doc_freq.get(token, 0)
+    RETURN log( (N + 1) / (df + 1) )  // smoothed IDF
+END
+
+FONKSİYON FindSimilarTokens(token):
+    // trigram ya da edit-distance tabanlı arama
+    similar ← []
+    // örnek basit: tüm index'te 1-2 edit distance'lı token'ları ara (optimize edilecek)
+    FOR t IN keys(INDEX.inverted_index) DO
+        IF EditDistance(token, t) ≤ 1 THEN similar.append(t)
+    ENDFOR
+    RETURN similar
+END
+
+FONKSİYON PhraseSearch(phrase):
+    // eğer pos bilgisi (term positions) indekslendi ise hızlı; değilse basit substring scan
+    matches ← []
+    FOR book IN books_that_contain_all_tokens(phrase.tokens) DO
+        IF phrase_occurs_in_book(book, phrase) THEN matches.append(book.id)
+    ENDFOR
+    RETURN matches
+END
+
+FONKSİYON ViolatesFilters(book_id, filters):
+    book ← GetBookById(book_id)
+    IF filters.genre_set EXISTS AND NOT intersects(book.genres, filters.genre_set) THEN RETURN true
+    IF filters.language EXISTS AND book.language != filters.language THEN RETURN true
+    IF filters.year_from EXISTS AND book.year < filters.year_from THEN RETURN true
+    IF filters.year_to EXISTS AND book.year > filters.year_to THEN RETURN true
+    IF filters.available_only == true AND book.available_copies == 0 THEN RETURN true
+    RETURN false
+END
+
+FONKSİYON BookAvailable(book_id):
+    book ← GetBookById(book_id)
+    RETURN book.available_copies > 0
+END
+
+FONKSİYON SuggestCorrections(tokens):
+    suggestions ← []
+    FOR t IN tokens DO
+        cand ← MostLikelyTokenCorrection(t)  // edit-distance + frequency
+        IF cand != t THEN suggestions.append(cand)
+    ENDFOR
+    RETURN suggestions (uniq, ranked)
+END
+
+FONKSİYON GenerateSnippet(book, tokens):
+    // kitaptaki özetten token'ların geçtiği kısımları çıkar ve vurgula
+    snippet ← extract_sentence_with_most_matches(book.summary, tokens)
+    RETURN highlight_tokens(snippet, tokens)
+END
+
+--- Rezervasyon / Ödünç Alma Akışı (eşzamanlılık) ---
+FONKSİYON ReserveBook(user_id, book_id):
+    // 1. Kısa süreli tutma: DB transaction veya locking kullan
+    BEGIN TRANSACTION
+        book ← SELECT * FROM books WHERE id = book_id FOR UPDATE  // satır kilidi
+        IF book.available_copies <= 0 THEN
+            ROLLBACK
+            RETURN { success: false, reason: "NoCopies" }
+        ENDIF
+        // decrement and create hold record
+        book.available_copies ← book.available_copies - 1
+        UPDATE books SET available_copies = book.available_copies WHERE id = book_id
+        hold_id ← CREATE hold(user_id, book_id, expires_at = now() + HOLD_DURATION)
+    COMMIT
+
+    // 2. Bildirim ve TTL: hold süresi dolarsa otomatik iade (background job; burada sadece iş akışı)
+    SendUserNotification(user_id, "BookHeld", hold_id)
+    RETURN { success: true, hold_id: hold_id, expires_at: now() + HOLD_DURATION }
+END
+
+FONKSİYON CheckoutHold(user_id, hold_id):
+    BEGIN TRANSACTION
+        hold ← SELECT * FROM holds WHERE id = hold_id FOR UPDATE
+        IF hold.user_id != user_id OR hold.is_used OR hold.is_expired THEN
+            ROLLBACK
+            RETURN { success: false, reason: "InvalidHold" }
+        ENDIF
+        // kaydı güncelle
+        hold.is_used ← true
+        UPDATE holds SET is_used = true WHERE id = hold_id
+        loan_id ← CREATE loan(user_id, hold.book_id, loan_start = now(), due_date = now() + LOAN_PERIOD)
+    COMMIT
+    RETURN { success: true, loan_id: loan_id }
+END
+
+FONKSİYON ReturnBook(loan_id):
+    BEGIN TRANSACTION
+        loan ← SELECT * FROM loans WHERE id = loan_id FOR UPDATE
+        IF loan.is_returned THEN
+            ROLLBACK
+            RETURN { success: false, reason: "AlreadyReturned" }
+        ENDIF
+        UPDATE loans SET is_returned = true, return_date = now() WHERE id = loan_id
+        UPDATE books SET available_copies = available_copies + 1 WHERE id = loan.book_id
+    COMMIT
+    RETURN { success: true }
+END
+
+--- Yönetim & Arka-plan işleri ---
+FONKSİYON BackgroundExpireHolds():
+    // zaman zaman çalıştırılır (cron/job)
+    nowt ← now()
+    expired ← SELECT * FROM holds WHERE expires_at < nowt AND is_used = false AND is_explicitly_released = false
+    FOR each h IN expired DO
+        BEGIN TRANSACTION
+            UPDATE books SET available_copies = available_copies + 1 WHERE id = h.book_id
+            UPDATE holds SET is_expired = true WHERE id = h.id
+        COMMIT
+        NotifyNextUserIfQueueExists(h.book_id)  // opsiyonel: bekleme listesi varsa sıradakine haber ver
+    ENDFOR
+END
+
+--- Hata ve Köşebilgileri ---
+- Eğer indeks eksik/sema hatası varsa `Search` içinde fallback olarak doğrudan DB substring araması yapılır (yavaş).
+- Büyük koleksiyonlarda `FindSimilarTokens` ve edit-distance full-scan'dan kaçınılmalı; trigram-index veya bk-tree kullanılmalı.
+- Cache invalidation: kitap güncellenince / yeni eklendiğinde uygun cache anahtarları silinmeli.
+
+SON ALGORİTMA
