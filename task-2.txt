@@ -1,4 +1,131 @@
-Öğrenci No:
-AD-SOYAD:
+Öğrenci No: 240541031
+AD-SOYAD: Sezer ÇETİNKAYA 
 
 Lütfen seçtiğiniz algoritmaya ait çözümü ve diğer isterleri aşağıya ekleyiniz:
+ALGORİTMA TicTacToeStratejisi
+    TAHTA ← 3x3 boş matris
+    OYUNCU_AI ← 'X'
+    OYUNCU_INSAN ← 'O'
+
+    FONKSİYON Oyna()
+        TahtayıBaşlat(TAHTA)
+        GÖSTER(TAHTA)
+
+        WHILE true DO
+            // --- 1. Oyuncu hamlesi ---
+            hareket ← KullanıcıdanHamleAl()
+            EĞER GeçerliHamleMi(TAHTA, hareket) DEĞİLSE
+                YAZ "Geçersiz hamle, tekrar dene."
+                DEVAM ET
+            SON
+            HamleyiYap(TAHTA, hareket, OYUNCU_INSAN)
+            GÖSTER(TAHTA)
+
+            EĞER KazandıMı(TAHTA, OYUNCU_INSAN) İSE
+                YAZ "Kazandın!"
+                ÇIKIŞ
+            SON
+
+            EĞER BerabereMi(TAHTA) İSE
+                YAZ "Berabere!"
+                ÇIKIŞ
+            SON
+
+            // --- 2. Yapay zekâ hamlesi ---
+            yapayHamle ← EnİyiHamleyiBul(TAHTA, OYUNCU_AI)
+            HamleyiYap(TAHTA, yapayHamle, OYUNCU_AI)
+            YAZ "Yapay zekâ oynadı:", yapayHamle
+            GÖSTER(TAHTA)
+
+            EĞER KazandıMı(TAHTA, OYUNCU_AI) İSE
+                YAZ "Yapay zekâ kazandı!"
+                ÇIKIŞ
+            SON
+
+            EĞER BerabereMi(TAHTA) İSE
+                YAZ "Berabere!"
+                ÇIKIŞ
+            SON
+        SON WHILE
+    SON FONKSİYON
+
+
+    // --- Yardımcı Fonksiyonlar ---
+
+    FONKSİYON EnİyiHamleyiBul(TAHTA, oyuncu)
+        // 1. Kural tabanlı hızlı kontrol
+        EĞER KazanmaHamlesiVar(TAHTA, oyuncu) İSE
+            DÖNDÜR O Hamle
+        SON
+        EĞER RakipKazanacakMi(TAHTA, oyuncu) İSE
+            DÖNDÜR EngellemeHamlesi(TAHTA, oyuncu)
+        SON
+        EĞER MerkezBoşMu(TAHTA) İSE
+            DÖNDÜR (1,1)
+        SON
+        EĞER BoşKöşeVarMi(TAHTA) İSE
+            DÖNDÜR HerhangiBirKöşe(TAHTA)
+        SON
+        EĞER BoşKenarVarMi(TAHTA) İSE
+            DÖNDÜR HerhangiBirKenar(TAHTA)
+        SON
+
+        // 2. Eğer basit çözüm yoksa Minimax kullan
+        (puan, hamle) ← Minimax(TAHTA, oyuncu, derinlik=0, alfa=-∞, beta=+∞)
+        DÖNDÜR hamle
+    SON FONKSİYON
+
+
+    FONKSİYON Minimax(TAHTA, oyuncu, derinlik, alfa, beta)
+        EĞER KazandıMı(TAHTA, OYUNCU_AI) İSE DÖNDÜR (10 - derinlik, null)
+        EĞER KazandıMı(TAHTA, OYUNCU_INSAN) İSE DÖNDÜR (-10 + derinlik, null)
+        EĞER BerabereMi(TAHTA) İSE DÖNDÜR (0, null)
+
+        EĞER oyuncu == OYUNCU_AI İSE
+            enİyiPuan ← -∞
+            enİyiHamle ← null
+            FOR her boş hücre H İÇİN
+                HamleyiYap(TAHTA, H, oyuncu)
+                (puan, _) ← Minimax(TAHTA, Rakip(oyuncu), derinlik+1, alfa, beta)
+                HamleyiGeriAl(TAHTA, H)
+                EĞER puan > enİyiPuan İSE
+                    enİyiPuan ← puan
+                    enİyiHamle ← H
+                SON
+                alfa ← MAKS(alfa, puan)
+                EĞER beta ≤ alfa İSE KES (beta-cutoff)
+            SON FOR
+            DÖNDÜR (enİyiPuan, enİyiHamle)
+
+        DEĞİLSE // rakip
+            enİyiPuan ← +∞
+            enİyiHamle ← null
+            FOR her boş hücre H İÇİN
+                HamleyiYap(TAHTA, H, oyuncu)
+                (puan, _) ← Minimax(TAHTA, Rakip(oyuncu), derinlik+1, alfa, beta)
+                HamleyiGeriAl(TAHTA, H)
+                EĞER puan < enİyiPuan İSE
+                    enİyiPuan ← puan
+                    enİyiHamle ← H
+                SON
+                beta ← MİN(beta, puan)
+                EĞER beta ≤ alfa İSE KES (alpha-cutoff)
+            SON FOR
+            DÖNDÜR (enİyiPuan, enİyiHamle)
+        SON
+    SON FONKSİYON
+
+
+    FONKSİYON KazandıMı(TAHTA, oyuncu)
+        HER SATIR, SÜTUN, VE ÇAPRAZ KONTROL ET
+        EĞER üçü de oyuncuya aitse DÖNDÜR TRUE
+        DEĞİLSE DÖNDÜR FALSE
+    SON FONKSİYON
+
+    FONKSİYON BerabereMi(TAHTA)
+        EĞER hiç boş hücre yoksa VE kimse kazanmadıysa
+            DÖNDÜR TRUE
+        DEĞİLSE DÖNDÜR FALSE
+    SON FONKSİYON
+
+SON ALGORİTMA
