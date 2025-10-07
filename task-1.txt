@@ -1,4 +1,68 @@
-Öğrenci No:
-AD-SOYAD:
+Öğrenci No: 240541031
+AD-SOYAD: Sezer ÇETİNKAYA 
 
 Lütfen seçtiğiniz algoritmaya ait çözümü ve diğer isterleri aşağıya ekleyiniz:
+ALGORİTMA: OptimumButceliMarketAlisverisi
+
+GİRDİ:
+    bütçe ← kullanıcıdan alınır
+    ürün_listesi ← kullanıcıdan alınır (ürün adı, öncelik, miktar)
+    fiyat_listesi ← her ürünün fiyatı (veri tabanı veya kullanıcı girişi)
+    
+ÇIKTI:
+    alınacak_ürünler listesi
+    toplam_tutar
+
+BAŞLA
+
+    toplam_tutar ← 0
+    alınacak_ürünler ← boş liste
+
+    // 1. Ürünleri önceliğe göre sırala (1 = en önemli)
+    ürün_listesi ← önceliğe_göre_sırala(ürün_listesi)
+
+    // 2. Ürünleri sırayla değerlendir
+    i ← 0
+    WHILE i < uzunluk(ürün_listesi) VE toplam_tutar < bütçe DO
+
+        ürün ← ürün_listesi[i]
+        fiyat ← fiyat_listesi[ürün.ad]
+        miktar ← ürün.miktar
+        toplam_fiyat ← fiyat * miktar
+
+        // 3. Ürün bütçeye sığıyorsa al
+        IF toplam_tutar + toplam_fiyat ≤ bütçe THEN
+            alınacak_ürünler’e ekle(ürün)
+            toplam_tutar ← toplam_tutar + toplam_fiyat
+
+        ELSE
+            // 4. Ürün bütçeyi aşıyorsa alternatif dene
+            alternatif_var_mı ← kontrol_et_alternatif(ürün)
+
+            IF alternatif_var_mı THEN
+                alternatif ← ucuz_alternatif(ürün)
+                alternatif_fiyat ← fiyat_listesi[alternatif.ad] * alternatif.miktar
+
+                IF toplam_tutar + alternatif_fiyat ≤ bütçe THEN
+                    alınacak_ürünler’e ekle(alternatif)
+                    toplam_tutar ← toplam_tutar + alternatif_fiyat
+                ELSE
+                    // Alternatif de sığmıyor
+                    yaz("Bütçeye sığmadığı için " + ürün.ad + " alınamadı.")
+                ENDIF
+            ELSE
+                // Hiç alternatif yok
+                yaz("Bütçeye sığmadığı için " + ürün.ad + " alınamadı.")
+            ENDIF
+        ENDIF
+
+        i ← i + 1
+
+    ENDWHILE
+
+    // 5. Sonuçları yazdır
+    yaz("Alınan ürünler: ", alınacak_ürünler)
+    yaz("Toplam harcama: ", toplam_tutar)
+    yaz("Kalan bütçe: ", bütçe - toplam_tutar)
+
+BİTİR
