@@ -1,4 +1,83 @@
-Öğrenci No:
-AD-SOYAD:
+Öğrenci No: 240541031
+AD-SOYAD:Sezer ÇETİNKAYA 
 
 Lütfen seçtiğiniz algoritmaya ait çözümü ve diğer isterleri aşağıya ekleyiniz:
+ALGORİTMA Ortak_Karar_Sistemi
+    BAŞLA
+        // 1. Katılımcı bilgilerini al
+        Yaz("Kaç kişi karar verecek?")
+        Oku(grup_sayisi)
+        
+        // 2. Oy seçeneklerini belirle
+        Yaz("Kaç seçenek arasından seçim yapılacak?")
+        Oku(secenek_sayisi)
+        
+        // 3. Seçenekleri listeye ekle
+        secenekler <- boş liste
+        i <- 1
+        TEKRAR i <= secenek_sayisi İKEN
+            Yaz("Seçenek ", i, " giriniz:")
+            Oku(secenek)
+            secenekler[i] <- secenek
+            i <- i + 1
+        TEKRAR_SONU
+        
+        // 4. Her üyenin oyu alınır
+        oylar <- boş liste
+        i <- 1
+        TEKRAR i <= grup_sayisi İKEN
+            Yaz("Kullanıcı ", i, ", lütfen seçiminizi giriniz (1 - ", secenek_sayisi, "):")
+            Oku(oy)
+            
+            // Koşul: Geçersiz oy kontrolü
+            EĞER oy < 1 VEYA oy > secenek_sayisi İSE
+                Yaz("Geçersiz seçim! Lütfen tekrar deneyiniz.")
+                DEVAM_ET // aynı kişinin tekrar girmesini sağlar
+            DEĞİLSE
+                oylar[i] <- oy
+            SON_EĞER
+            
+            i <- i + 1
+        TEKRAR_SONU
+        
+        // 5. Oyları say
+        oy_sayaci <- dizi[1..secenek_sayisi] olarak 0’a ayarlanır
+        i <- 1
+        TEKRAR i <= grup_sayisi İKEN
+            secilen <- oylar[i]
+            oy_sayaci[secilen] <- oy_sayaci[secilen] + 1
+            i <- i + 1
+        TEKRAR_SONU
+        
+        // 6. En çok oyu bulan kısım
+        en_yuksek <- oy_sayaci[1]
+        kazanan_index <- 1
+        i <- 2
+        TEKRAR i <= secenek_sayisi İKEN
+            EĞER oy_sayaci[i] > en_yuksek İSE
+                en_yuksek <- oy_sayaci[i]
+                kazanan_index <- i
+            SON_EĞER
+            i <- i + 1
+        TEKRAR_SONU
+        
+        // 7. Eşitlik durumu kontrolü
+        esitlik_var <- YANLIŞ
+        i <- 1
+        TEKRAR i <= secenek_sayisi İKEN
+            EĞER i ≠ kazanan_index VE oy_sayaci[i] = en_yuksek İSE
+                esitlik_var <- DOĞRU
+            SON_EĞER
+            i <- i + 1
+        TEKRAR_SONU
+        
+        // 8. Sonuç
+        EĞER esitlik_var = DOĞRU İSE
+            Yaz("Eşitlik oluştu! Yeni bir oylama yapılacak.")
+            GİT 4 // oylama adımına geri dön
+        DEĞİLSE
+            Yaz("Kazanan seçenek: ", secenekler[kazanan_index])
+            Yaz("Toplam oy: ", en_yuksek)
+        SON_EĞER
+    BİTİR
+ALGORİTMA SONU
