@@ -1,4 +1,140 @@
-Öğrenci No:
-AD-SOYAD:
+Öğrenci No: 240541031
+AD-SOYAD:Sezer ÇETİNKAYA 
 
 Lütfen seçtiğiniz algoritmaya ait çözümü ve diğer isterleri aşağıya ekleyiniz:
+ALGORİTMA: OtobusRotasiOptimizasyonu
+
+Girdi:
+    N: durak sayısı
+    duraklar[1..N]: her durağın koordinatı (x, y)
+    başlangıç_durağı: ana garaj veya ilk durak
+    yakıt_sınırlaması: maksimum mesafe veya süre
+    trafik_matrisi[i][j]: iki durak arasındaki ortalama süre (dakika)
+    yol_kapalı[i][j]: true ise o yol kullanılamaz
+    maksimum_iterasyon: optimizasyon adımı limiti
+
+Çıktı:
+    en_iyi_rota: durak sırası listesi
+    en_iyi_maliyet: toplam mesafe veya süre
+
+---
+
+ADIM 1: Mesafe Matrisi Oluştur
+FOR i ← 1 TO N DO
+    FOR j ← 1 TO N DO
+        IF i = j THEN
+            mesafe[i][j] ← 0
+        ELSE IF yol_kapalı[i][j] = TRUE THEN
+            mesafe[i][j] ← ∞
+        ELSE
+            mesafe[i][j] ← EuclideanDistance(duraklar[i], duraklar[j])
+        ENDIF
+    ENDFOR
+ENDFOR
+
+---
+
+ADIM 2: Başlangıç Rotasını Belirle
+rota ← [başlangıç_durağı] + (diğer durakları rastgele sırala)
+en_iyi_rota ← rota
+en_iyi_maliyet ← RotaMaliyeti(rota, mesafe, trafik_matrisi)
+
+---
+
+FONKSİYON RotaMaliyeti(rota, mesafe, trafik):
+    toplam ← 0
+    FOR k ← 1 TO rota.uzunluk - 1 DO
+        i ← rota[k]
+        j ← rota[k + 1]
+        IF yol_kapalı[i][j] = TRUE THEN
+            RETURN ∞
+        ENDIF
+        toplam ← toplam + mesafe[i][j] + trafik[i][j]
+    ENDFOR
+    RETURN toplam
+END
+
+---
+
+ADIM 3: İyileştirme Döngüsü Başlat
+iterasyon ← 0
+DURDUR ← FALSE
+
+WHILE DURDUR = FALSE DO
+    rota_değişti ← FALSE
+
+    // Her iki durağın yerini değiştirerek alternatif rotalar üret
+    FOR i ← 2 TO N-1 DO
+        FOR j ← i+1 TO N DO
+            yeni_rota ← SwapDuraklar(en_iyi_rota, i, j)
+            yeni_maliyet ← RotaMaliyeti(yeni_rota, mesafe, trafik_matrisi)
+
+            // Yeni rota daha kısa mı?
+            IF yeni_maliyet < en_iyi_maliyet THEN
+                en_iyi_rota ← yeni_rota
+                en_iyi_maliyet ← yeni_maliyet
+                rota_değişti ← TRUE
+            ENDIF
+        ENDFOR
+    ENDFOR
+
+    iterasyon ← iterasyon + 1
+
+    // İyileşme olmadıysa veya iterasyon limiti dolduysa dur
+    IF rota_değişti = FALSE OR iterasyon ≥ maksimum_iterasyon THEN
+        DURDUR ← TRUE
+    ENDIF
+ENDWHILE
+
+---
+
+ADIM 4: Yakıt veya Mesafe Kısıtlarını Kontrol Et
+toplam_mesafe ← RotaMaliyeti(en_iyi_rota, mesafe, trafik_matrisi)
+IF toplam_mesafe > yakıt_sınırlaması THEN
+    // Rota fazla uzun, bölünmüş alt rotalar oluştur
+    alt_rotalar ← BölRota(en_iyi_rota, yakıt_sınırlaması, mesafe)
+    en_iyi_rota ← alt_rotalar
+ENDIF
+
+---
+
+ADIM 5: Çıktı
+Yaz("En iyi rota:", en_iyi_rota)
+Yaz("Toplam süre/maliyet:", en_iyi_maliyet)
+Bitti.
+
+---
+
+FONKSİYON SwapDuraklar(rota, i, j):
+    yeni ← rota kopyası
+    temp ← yeni[i]
+    yeni[i] ← yeni[j]
+    yeni[j] ← temp
+    RETURN yeni
+END
+
+FONKSİYON BölRota(rota, limit, mesafe):
+    alt_rotalar ← []
+    geçici_rota ← [rota[1]]
+    toplam ← 0
+    FOR k ← 2 TO rota.uzunluk DO
+        i ← rota[k-1]
+        j ← rota[k]
+        toplam ← toplam + mesafe[i][j]
+        IF toplam > limit THEN
+            alt_rotalar.append(geçici_rota)
+            geçici_rota ← [rota[k]]
+            toplam ← 0
+        ELSE
+            geçici_rota.append(rota[k])
+        ENDIF
+    ENDFOR
+    alt_rotalar.append(geçici_rota)
+    RETURN alt_rotalar
+END
+
+FONKSİYON EuclideanDistance(a, b):
+    RETURN sqrt( (a.x - b.x)^2 + (a.y - b.y)^2 )
+END
+
+SON ALGORİTMA
